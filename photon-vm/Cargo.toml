@@ -1,0 +1,11 @@
+[package]
+name = "photon-vm"
+version = "0.1.0"
+edition = "2021"
+description = "revm-hosted invariant fuzzer engine for Photon (Phase 3)"
+
+[dependencies]
+photon-types = { path = "../photon-types" }
+photon-ir = { path = "../photon-ir" }
+thiserror.workspace = true
+tracing.workspace = true

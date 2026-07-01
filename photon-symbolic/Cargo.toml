@@ -1,0 +1,11 @@
+[package]
+name = "photon-symbolic"
+version = "0.1.0"
+edition = "2021"
+description = "Z3-backed symbolic solver engine for Photon (Phase 2)"
+
+[dependencies]
+photon-types = { path = "../photon-types" }
+photon-ir = { path = "../photon-ir" }
+thiserror.workspace = true
+tracing.workspace = true

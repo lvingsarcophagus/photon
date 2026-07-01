@@ -1,0 +1,13 @@
+[package]
+name = "photon-static"
+version = "0.1.0"
+edition = "2021"
+description = "Rayon-parallel static linter engine for Photon — structural pattern matching over DFG"
+
+[dependencies]
+photon-types = { path = "../photon-types" }
+photon-ir = { path = "../photon-ir" }
+solang-parser = "0.3"
+rayon.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

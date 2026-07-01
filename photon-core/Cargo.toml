@@ -1,0 +1,15 @@
+[package]
+name = "photon-core"
+version = "0.1.0"
+edition = "2021"
+description = "Ingestion engine for Photon — parses Solidity source into AST with panic isolation"
+
+[dependencies]
+photon-types = { path = "../photon-types" }
+solang-parser = "0.3"
+thiserror.workspace = true
+tracing.workspace = true
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,25 @@
+[package]
+name = "photon-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI entry point for the Photon Web3 vulnerability assessment framework"
+
+[[bin]]
+name = "photon"
+path = "src/main.rs"
+
+[dependencies]
+photon-types = { path = "../photon-types" }
+photon-core = { path = "../photon-core" }
+photon-ir = { path = "../photon-ir" }
+photon-static = { path = "../photon-static" }
+photon-symbolic = { path = "../photon-symbolic" }
+photon-vm = { path = "../photon-vm" }
+photon-ai = { path = "../photon-ai" }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+colored = "2"

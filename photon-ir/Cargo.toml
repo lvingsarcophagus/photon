@@ -1,0 +1,13 @@
+[package]
+name = "photon-ir"
+version = "0.1.0"
+edition = "2021"
+description = "Graph transformation tier — lowers AST into SSA-form CFG/DFG for Photon"
+
+[dependencies]
+photon-types = { path = "../photon-types" }
+photon-core = { path = "../photon-core" }
+petgraph.workspace = true
+solang-parser = "0.3"
+thiserror.workspace = true
+tracing.workspace = true
