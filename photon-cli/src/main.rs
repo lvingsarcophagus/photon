@@ -242,7 +242,7 @@ fn run_scan(
     );
 
     // ═══════════════════════════════════════════════════════════
-    // Stage 3: Symbolic Analysis (Phase 2 stub)
+    // Stage 3: Symbolic Analysis (Z3)
     // ═══════════════════════════════════════════════════════════
     if enable_symbolic {
         println!("{}", "  ◆ Stage 3: Symbolic Analysis (Z3)".yellow().bold());
@@ -250,11 +250,32 @@ fn run_scan(
             enabled: true,
             ..SymbolicConfig::default()
         });
-        let sym_findings = symbolic.analyze(&all_irs, &findings);
-        findings.extend(sym_findings);
+        let sym_result = symbolic.analyze(&all_irs, &findings);
+
+        if sym_result.z3_available {
+            println!(
+                "    Z3 solver: {} — {} queries ({} {}, {} {}, {} {})",
+                "available".green(),
+                sym_result.queries_total,
+                sym_result.queries_sat.to_string().red().bold(),
+                "SAT".red(),
+                sym_result.queries_unsat.to_string().green(),
+                "UNSAT".green(),
+                sym_result.queries_unknown.to_string().yellow(),
+                "UNKNOWN".yellow()
+            );
+        } else {
+            println!(
+                "    Z3 solver: {} — {} queries marked as UNKNOWN",
+                "not found (degraded mode)".yellow(),
+                sym_result.queries_total
+            );
+        }
+
+        findings.extend(sym_result.findings);
         report.engines_used.push(Engine::Symbolic);
-        println!("    {}", "Phase 2 stub — no symbolic analysis performed".dimmed());
     }
+
 
     // ═══════════════════════════════════════════════════════════
     // Stage 4: VM Fuzzing (Phase 3 stub)

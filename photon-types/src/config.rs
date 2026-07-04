@@ -147,18 +147,23 @@ pub struct SymbolicConfig {
 
     /// Only run on paths flagged by static analysis (gated execution).
     pub gated_only: bool,
+
+    /// Path to the Z3 binary. If None, searches PATH for "z3".
+    pub z3_path: Option<PathBuf>,
 }
 
 impl Default for SymbolicConfig {
     fn default() -> Self {
         Self {
-            enabled: false, // Disabled in Phase 1 (stub)
+            enabled: false,
             solver_timeout: Duration::from_secs(30),
             max_depth: 64,
             gated_only: true,
+            z3_path: None,
         }
     }
 }
+
 
 /// VM fuzzer configuration (Section 4.5).
 #[derive(Debug, Clone, Serialize, Deserialize)]

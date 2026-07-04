@@ -7,5 +7,6 @@ description = "Z3-backed symbolic solver engine for Photon (Phase 2)"
 [dependencies]
 photon-types = { path = "../photon-types" }
 photon-ir = { path = "../photon-ir" }
+solang-parser = "0.3.5"
 thiserror.workspace = true
 tracing.workspace = true
