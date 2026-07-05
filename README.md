@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.jpg" alt="Photon Logo" width="250" height="250" />
+  <img src="photon-logo.jpg" alt="Photon Logo" width="250" height="250" style="border-radius: 50%; object-fit: cover;" />
 </p>
 
 # Photon
