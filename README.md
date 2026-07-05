@@ -16,7 +16,8 @@ Designed to be integrated directly into developer workflows (CLI) and CI/CD pipe
 - **Rayon-Parallel Engine**: Rayon work-stealing parallel static linter for lightning-fast analysis scaling sub-linearly with contract size.
 - **CFG & DFG Graph IR**: Lowers Solidity ASTs into static single assignment (SSA) control flow and data flow graphs.
 - **Deterministic Scanning**: Guarantees identical finding outputs across repeated runs for reproducible CI gating.
-- **Hard-Boundaried AI Layer**: Optional AI post-processor (Anthropic Claude, OpenAI GPT, Groq Llama) for advisory remediation prose and false-positive triage without mutating or suppressing deterministic results.
+- **On-Chain Attestations**: Integrated Chainlink Functions support for verifiable security attestations on-chain.
+- **Hard-Boundaried AI Layer** (Coming Soon): Optional AI post-processor (Anthropic Claude, OpenAI GPT, Groq Llama) for advisory remediation prose and false-positive triage without mutating or suppressing deterministic results.
 
 ---
 
@@ -49,6 +50,19 @@ Photon is built as a strict, unidirectional pipeline:
 │ (SMT Solver) │                │ (revm Fuzzer)│
 └──────────────┘                └──────────────┘
 ```
+
+---
+
+## Project Status
+
+**✅ Completed Phases (1-4):**
+- **Phase 1**: Static Analysis Engine - Rayon-parallel structural pattern matching and rule evaluation
+- **Phase 2**: Symbolic Execution - Z3 SMT solver integration for path verification
+- **Phase 3**: Dynamic VM Fuzzing - revm-based property and invariant testing
+- **Phase 4**: On-Chain Attestations - Chainlink Functions integration for verifiable security proofs
+
+**🚧 In Development:**
+- **Phase 5**: AI-Assisted Analysis Layer - Multi-provider post-processor for remediation guidance and false-positive triage (optional, non-deterministic layer that never affects core findings)
 
 ---
 
@@ -137,7 +151,7 @@ Photon supports on-chain security attestations via **Chainlink Functions**, allo
 - `photon-symbolic`: Z3 SMT solver path verification engine.
 - `photon-vm`: revm-hosted dynamic simulation and property-based invariant fuzzing engine.
 - `photon-functions`: Off-chain Chainlink Functions Javascript source code.
-- `photon-ai`: Multi-provider async post-processor interface (Phase 5 stub).
+- `photon-ai`: Multi-provider async post-processor interface (Phase 5 - In Development).
 - `photon-cli`: The terminal CLI binary.
 
 ---
