@@ -1,0 +1,3 @@
+# Ignore rules for testing
+reentrancy.sol:PHOTON-SECURITY-007
+arithmetic.sol:mint:PHOTON-ACCESS-001

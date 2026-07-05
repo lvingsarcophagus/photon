@@ -1,0 +1,568 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PhotonAttestationConsumer.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+          },
+          "ruleId": "PHOTON-SECURITY-011"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PhotonAttestationConsumer.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1708
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `requestAttestation` is external and modifies state variables [\"activeRequests\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PhotonAttestationConsumer.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 2450
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `handleOracleFulfillment` is external and modifies state variables [\"attestations\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+          },
+          "ruleId": "PHOTON-SECURITY-011"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 330
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "State variable `owner` is written without a zero-address validation check."
+          },
+          "ruleId": "PHOTON-SECURITY-008"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 565
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "State variable `owner` is written without a zero-address validation check."
+          },
+          "ruleId": "PHOTON-SECURITY-008"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 665
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `setCriticalValue` is public and modifies state variables [\"criticalValue\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 825
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `addAdmin` is public and modifies state variables [\"admins\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1022
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Unprotected `selfdestruct` in function `destroy`. Any external account can destroy this contract."
+          },
+          "ruleId": "PHOTON-ACCESS-002"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "access_control.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1022
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `destroy` contains a selfdestruct / suicide call."
+          },
+          "ruleId": "PHOTON-SECURITY-013"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "arithmetic.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract `ArithmeticTest` uses Solidity < 0.8.0 without SafeMath. Arithmetic operations may silently overflow or underflow."
+          },
+          "ruleId": "PHOTON-ARITH-001"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "arithmetic.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+          },
+          "ruleId": "PHOTON-SECURITY-011"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "arithmetic.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "State variable in contract `ArithmeticTest` may be uninitialized."
+          },
+          "ruleId": "PHOTON-SECURITY-014"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "arithmetic.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 488
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `burn` is public and modifies state variables [\"totalSupply\", \"balanceOf\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "arithmetic.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 658
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `transfer` is public and modifies state variables [\"balanceOf\", \"balanceOf\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "oracle.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+          },
+          "ruleId": "PHOTON-SECURITY-011"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "oracle.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+          },
+          "ruleId": "PHOTON-SECURITY-011"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "oracle.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 27
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Oracle call `latestRoundData` in function `getUnsafePrice` of contract `OracleTest` without staleness check. The price data may be stale or manipulated."
+          },
+          "ruleId": "PHOTON-ORACLE-001"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "oracle.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1114
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `getSafePrice` uses block.timestamp in a condition guard."
+          },
+          "ruleId": "PHOTON-SECURITY-003"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "reentrancy.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+          },
+          "ruleId": "PHOTON-SECURITY-011"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "reentrancy.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 443
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `deposit` is public and modifies state variables [\"balances\"] without access control. Any external account can call this function."
+          },
+          "ruleId": "PHOTON-ACCESS-001"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "reentrancy.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 740
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `withdraw` uses block.timestamp in a condition guard."
+          },
+          "ruleId": "PHOTON-SECURITY-003"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "reentrancy.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 853
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "External call to `msg.sender.call` precedes state update of `balances` in function `withdraw`. This violates the Check-Effects-Interactions pattern and may allow reentrancy."
+          },
+          "ruleId": "PHOTON-REENTRANCY-001"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "reentrancy.sol"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 1252
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Function `safeWithdraw` uses block.timestamp in a condition guard."
+          },
+          "ruleId": "PHOTON-SECURITY-003"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Photon",
+          "rules": [
+            {
+              "id": "PHOTON-SECURITY-011",
+              "name": "SECURITY-011",
+              "shortDescription": {
+                "text": "Contract uses a floating compiler pragma. This can lead to deployment with unverified compiler versions."
+              }
+            },
+            {
+              "id": "PHOTON-ACCESS-001",
+              "name": "ACCESS-001",
+              "shortDescription": {
+                "text": "Function `requestAttestation` is external and modifies state variables [\"activeRequests\"] without access control. Any external account can call this function."
+              }
+            },
+            {
+              "id": "PHOTON-SECURITY-008",
+              "name": "SECURITY-008",
+              "shortDescription": {
+                "text": "State variable `owner` is written without a zero-address validation check."
+              }
+            },
+            {
+              "id": "PHOTON-ACCESS-002",
+              "name": "ACCESS-002",
+              "shortDescription": {
+                "text": "Unprotected `selfdestruct` in function `destroy`. Any external account can destroy this contract."
+              }
+            },
+            {
+              "id": "PHOTON-SECURITY-013",
+              "name": "SECURITY-013",
+              "shortDescription": {
+                "text": "Function `destroy` contains a selfdestruct / suicide call."
+              }
+            },
+            {
+              "id": "PHOTON-ARITH-001",
+              "name": "ARITH-001",
+              "shortDescription": {
+                "text": "Contract `ArithmeticTest` uses Solidity < 0.8.0 without SafeMath. Arithmetic operations may silently overflow or underflow."
+              }
+            },
+            {
+              "id": "PHOTON-SECURITY-014",
+              "name": "SECURITY-014",
+              "shortDescription": {
+                "text": "State variable in contract `ArithmeticTest` may be uninitialized."
+              }
+            },
+            {
+              "id": "PHOTON-ORACLE-001",
+              "name": "ORACLE-001",
+              "shortDescription": {
+                "text": "Oracle call `latestRoundData` in function `getUnsafePrice` of contract `OracleTest` without staleness check. The price data may be stale or manipulated."
+              }
+            },
+            {
+              "id": "PHOTON-SECURITY-003",
+              "name": "SECURITY-003",
+              "shortDescription": {
+                "text": "Function `getSafePrice` uses block.timestamp in a condition guard."
+              }
+            },
+            {
+              "id": "PHOTON-REENTRANCY-001",
+              "name": "REENTRANCY-001",
+              "shortDescription": {
+                "text": "External call to `msg.sender.call` precedes state update of `balances` in function `withdraw`. This violates the Check-Effects-Interactions pattern and may allow reentrancy."
+              }
+            }
+          ],
+          "version": "0.1.0"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

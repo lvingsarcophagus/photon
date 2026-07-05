@@ -72,6 +72,14 @@ enum Commands {
         /// Export Chainlink Functions attestation payload to the specified JSON file path
         #[arg(long)]
         export_attestation: Option<PathBuf>,
+
+        /// Export findings to a SARIF report file
+        #[arg(long)]
+        export_sarif: Option<PathBuf>,
+
+        /// Enable Slither compatibility mode (detector name mapping & JSON schema)
+        #[arg(long, default_value = "false")]
+        slither_compat: bool,
     },
 
     /// List available analysis rules
@@ -131,8 +139,19 @@ fn main() {
             symbolic,
             fuzz,
             export_attestation,
+            export_sarif,
+            slither_compat,
         } => {
-            let exit_code = run_scan(target_dir, format, severity_threshold.into(), symbolic, fuzz, export_attestation);
+            let exit_code = run_scan(
+                target_dir,
+                format,
+                severity_threshold.into(),
+                symbolic,
+                fuzz,
+                export_attestation,
+                export_sarif,
+                slither_compat,
+            );
             std::process::exit(exit_code);
         }
         Commands::Rules => {
@@ -151,6 +170,8 @@ fn run_scan(
     enable_symbolic: bool,
     enable_fuzz: bool,
     export_attestation: Option<PathBuf>,
+    export_sarif: Option<PathBuf>,
+    slither_compat: bool,
 ) -> i32 {
     let start = Instant::now();
 
@@ -302,6 +323,29 @@ fn run_scan(
     }
 
     // ═══════════════════════════════════════════════════════════
+    // False Positive Suppression (.photon-ignore)
+    // ═══════════════════════════════════════════════════════════
+    let ignore_path = target_dir.join(".photon-ignore");
+    if ignore_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&ignore_path) {
+            let ignore_rules = photon_core::ignore::parse_ignore_file(&content);
+            let before_count = findings.len();
+            findings.retain(|finding| {
+                !ignore_rules.iter().any(|rule| {
+                    rule.matches(&finding.file, finding.line, &finding.rule_id, Some(&finding.description), None)
+                })
+            });
+            let ignored_count = before_count - findings.len();
+            if ignored_count > 0 {
+                println!(
+                    "    ✓ Suppressed {} false positives via .photon-ignore",
+                    ignored_count.to_string().green()
+                );
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // Aggregate Results
     // ═══════════════════════════════════════════════════════════
     report.findings = findings;
@@ -329,17 +373,30 @@ fn run_scan(
     // ═══════════════════════════════════════════════════════════
     println!();
 
-    match format {
-        FormatArg::Json => {
-            println!("{}", serde_json::to_string_pretty(&report).unwrap());
+    if slither_compat {
+        let slither_json = report.to_slither_compat();
+        println!("{}", serde_json::to_string_pretty(&slither_json).unwrap());
+    } else {
+        match format {
+            FormatArg::Json => {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap());
+            }
+            FormatArg::Sarif => {
+                let sarif_json = report.to_sarif();
+                println!("{}", serde_json::to_string_pretty(&sarif_json).unwrap());
+            }
+            FormatArg::Text => {
+                print_text_report(&report);
+            }
         }
-        FormatArg::Sarif => {
-            // SARIF output (simplified)
-            println!("{}", serde_json::to_string_pretty(&report).unwrap());
-            println!("{}", "(Full SARIF format coming in a future release)".dimmed());
-        }
-        FormatArg::Text => {
-            print_text_report(&report);
+    }
+
+    if let Some(sarif_path) = export_sarif {
+        let sarif_json = report.to_sarif();
+        if let Err(e) = std::fs::write(&sarif_path, serde_json::to_string_pretty(&sarif_json).unwrap()) {
+            error!("Failed to write SARIF report: {}", e);
+        } else {
+            println!("  ✓ Exported SARIF report to {}", sarif_path.display());
         }
     }
 

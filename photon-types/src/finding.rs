@@ -198,7 +198,113 @@ impl ScanReport {
             .iter()
             .any(|f| f.severity.meets_threshold(threshold))
     }
+
+    /// Export the scan report to the standard SARIF format.
+    pub fn to_sarif(&self) -> serde_json::Value {
+        let mut rules = Vec::new();
+        let mut results = Vec::new();
+        let mut registered_rules = std::collections::HashSet::new();
+
+        for finding in &self.findings {
+            let rule_id = &finding.rule_id;
+            if registered_rules.insert(rule_id.clone()) {
+                rules.push(serde_json::json!({
+                    "id": rule_id,
+                    "name": rule_id.replace("PHOTON-", ""),
+                    "shortDescription": {
+                        "text": finding.description
+                    }
+                }));
+            }
+
+            let level = match finding.severity {
+                Severity::Critical | Severity::High => "error",
+                Severity::Medium => "warning",
+                Severity::Low | Severity::Info => "note",
+            };
+
+            results.push(serde_json::json!({
+                "ruleId": rule_id,
+                "level": level,
+                "message": {
+                    "text": finding.description
+                },
+                "locations": [
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {
+                                "uri": finding.file.to_string_lossy()
+                            },
+                            "region": {
+                                "startLine": finding.line,
+                                "startColumn": finding.column.unwrap_or(1)
+                            }
+                        }
+                    }
+                ]
+            }));
+        }
+
+        serde_json::json!({
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {
+                        "driver": {
+                            "name": "Photon",
+                            "version": env!("CARGO_PKG_VERSION"),
+                            "rules": rules
+                        }
+                    },
+                    "results": results
+                }
+            ]
+        })
+    }
+
+    /// Export the scan report to Slither-compatible JSON format.
+    pub fn to_slither_compat(&self) -> serde_json::Value {
+        let mut detectors = Vec::new();
+
+        for finding in &self.findings {
+            let slither_detector = match finding.rule_id.as_str() {
+                "PHOTON-REENTRANCY-001" => "reentrancy-eth",
+                "PHOTON-REENTRANCY-002" => "reentrancy-no-eth",
+                "PHOTON-ACCESS-001" => "unprotected-state",
+                "PHOTON-ACCESS-002" => "suicidal",
+                "PHOTON-ARITH-001" => "overflow",
+                "PHOTON-ORACLE-001" => "oracle-manipulation",
+                other => other,
+            };
+
+            detectors.push(serde_json::json!({
+                "elements": [
+                    {
+                        "type": "node",
+                        "name": finding.file.file_name().unwrap_or_default().to_string_lossy(),
+                        "source_mapping": {
+                            "filename_relative": finding.file.to_string_lossy(),
+                            "lines": [finding.line]
+                        }
+                    }
+                ],
+                "description": finding.description,
+                "markdown": format!("### {}\n\n{}", finding.rule_id, finding.description),
+                "detector": slither_detector
+            }));
+        }
+
+        serde_json::json!({
+            "success": true,
+            "error": serde_json::Value::Null,
+            "results": {
+                "detectors": detectors
+            }
+        })
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -258,5 +364,20 @@ mod tests {
         assert!(report.has_findings_above_threshold(&Severity::Low));
         assert!(report.has_findings_above_threshold(&Severity::Medium));
         assert!(!report.has_findings_above_threshold(&Severity::High));
+    }
+
+    #[test]
+    fn test_exporters() {
+        let mut report = ScanReport::new(PathBuf::from("/test"));
+        report.findings.push(make_finding("PHOTON-REENTRANCY-001", Severity::Critical, 42));
+
+        let sarif = report.to_sarif();
+        assert_eq!(sarif["version"], "2.1.0");
+        assert_eq!(sarif["runs"][0]["tool"]["driver"]["name"], "Photon");
+        assert_eq!(sarif["runs"][0]["results"][0]["ruleId"], "PHOTON-REENTRANCY-001");
+
+        let slither = report.to_slither_compat();
+        assert_eq!(slither["success"], true);
+        assert_eq!(slither["results"]["detectors"][0]["detector"], "reentrancy-eth");
     }
 }

@@ -18,6 +18,8 @@ use thiserror::Error;
 use tracing::{debug, error, info, warn};
 use walkdir::WalkDir;
 
+pub mod ignore;
+
 /// Errors that can occur during ingestion.
 #[derive(Error, Debug)]
 pub enum IngestionError {

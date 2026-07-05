@@ -19,6 +19,8 @@ use std::path::PathBuf;
 use thiserror::Error;
 use tracing::{debug, warn};
 
+pub mod taint;
+
 /// Maximum number of nodes allowed in a single contract's CFG/DFG.
 const MAX_GRAPH_NODES: usize = 50_000;
 /// Maximum number of edges allowed in a single contract's CFG/DFG.

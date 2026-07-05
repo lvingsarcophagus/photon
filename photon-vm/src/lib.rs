@@ -197,6 +197,7 @@ impl VmEngine {
             let mut contract_findings = self.run_fuzzer(
                 &contract.name,
                 &contract.path,
+                &contract.source,
                 contract_address,
                 db,
                 &abi,
@@ -219,6 +220,7 @@ impl VmEngine {
         &self,
         contract_name: &str,
         file_path: &Path,
+        source_code: &str,
         contract_address: Address,
         mut db: CacheDB<EmptyDB>,
         abi: &[AbiElement],
@@ -254,11 +256,15 @@ impl VmEngine {
             new_account_info(U256::from(10_000_000_000_000_000_000u64), 1, None),
         );
 
-        let max_iterations = self.config.max_iterations.min(500); // Caps it to a reasonable number of iterations for test speed
+        let max_iterations = self.config.max_iterations.min(500);
 
         let mut reentrancy_triggered = false;
         let mut access_control_violated = false;
         let mut arithmetic_wrapped = false;
+
+        // Parse custom invariants from comments
+        let custom_invariants = parse_invariants(source_code);
+        let mut custom_invariant_violated = None;
 
         for (func_name, inputs) in &functions {
             // Generate the signature string: name(type1,type2,...)
@@ -270,7 +276,6 @@ impl VmEngine {
 
             for _ in 0..max_iterations {
                 // 1. INVARIANT CHECK: Access Control
-                // Call critical state-modifying functions from a non-owner (attacker)
                 if func_name.contains("Owner") || func_name.contains("Admin") || func_name.contains("Critical") || func_name.contains("destroy") {
                     let mut calldata = selector.to_vec();
                     for param_type in &param_types {
@@ -297,7 +302,6 @@ impl VmEngine {
 
                     if let Ok(res) = evm.transact_commit() {
                         if res.is_success() {
-                            // Check storage after
                             let db_after = evm.context.evm.db.clone();
                             let storage_after = db_after.accounts.get(&contract_address)
                                 .map(|a| a.storage.clone())
@@ -312,9 +316,7 @@ impl VmEngine {
                 }
 
                 // 2. INVARIANT CHECK: Reentrancy
-                // Trigger a reentrancy flow against the vault using the mock attacker contract
                 if func_name == "withdraw" && !reentrancy_triggered {
-                    // Deploy attacker contract
                     let reentrant_attacker_addr = Address::repeat_byte(0x88);
                     let attacker_code = vec![
                         0x34, 0x60, 0x02, 0x14, 0x60, 0x11, 0x57, 0x34, 0x60, 0x01, 0x14, 0x60, 0x31, 0x57, 0x60,
@@ -333,7 +335,7 @@ impl VmEngine {
 
                     db.insert_account_storage(
                         reentrant_attacker_addr,
-                        U256::from(0), // slot 0 holds vault address
+                        U256::from(0),
                         U256::from_be_bytes({
                             let mut bytes = [0u8; 32];
                             bytes[12..32].copy_from_slice(contract_address.as_slice());
@@ -343,11 +345,10 @@ impl VmEngine {
 
                     db.insert_account_storage(
                         reentrant_attacker_addr,
-                        U256::from(1), // slot 1 holds counter
+                        U256::from(1),
                         U256::ZERO,
                     ).unwrap();
 
-                    // Deposit 1 ETH from attacker EOA via contract to vault (value = 2 triggers deposit fallback)
                     let mut evm = Evm::builder()
                         .with_db(db.clone())
                         .with_spec_id(spec_id)
@@ -355,7 +356,7 @@ impl VmEngine {
                             tx.caller = attacker;
                             tx.transact_to = TransactTo::Call(reentrant_attacker_addr);
                             tx.data = Bytes::new();
-                            tx.value = U256::from(2); // 2 wei triggers deposit mode in fallback
+                            tx.value = U256::from(2);
                             tx.gas_limit = 3_000_000;
                             tx.gas_price = U256::from(1_000_000_000);
                         })
@@ -366,7 +367,6 @@ impl VmEngine {
                             if res.is_success() {
                                 db = evm.context.evm.db.clone();
 
-                                // Trigger reentrant withdraw call from EOA via contract (value = 1 triggers withdraw fallback)
                                 let mut evm = Evm::builder()
                                     .with_db(db.clone())
                                     .with_spec_id(spec_id)
@@ -374,7 +374,7 @@ impl VmEngine {
                                         tx.caller = attacker;
                                         tx.transact_to = TransactTo::Call(reentrant_attacker_addr);
                                         tx.data = Bytes::new();
-                                        tx.value = U256::from(1); // 1 wei triggers withdraw mode in fallback
+                                        tx.value = U256::from(1);
                                         tx.gas_limit = 3_000_000;
                                         tx.gas_price = U256::from(1_000_000_000);
                                     })
@@ -388,8 +388,6 @@ impl VmEngine {
                                                 .map(|a| a.info.balance)
                                                 .unwrap_or(U256::ZERO);
 
-                                            // Initial 10 ETH - 1 ETH (deposit) = 9 ETH.
-                                            // If reentrant call succeeded twice, it gets 2 ETH back -> total 11 ETH.
                                             if balance_after > U256::from(10_500_000_000_000_000_000u64) {
                                                 reentrancy_triggered = true;
                                                 break;
@@ -409,7 +407,6 @@ impl VmEngine {
                 }
 
                 // 3. INVARIANT CHECK: Arithmetic Overflow
-                // Fuzz arithmetic functions with extreme values
                 if func_name == "mint" || func_name == "burn" || func_name == "transfer" {
                     let mut calldata = selector.to_vec();
                     for param_type in &param_types {
@@ -430,16 +427,12 @@ impl VmEngine {
                         .build();
 
                     if let Ok(res) = evm.transact_commit() {
-                        // In pre-0.8.0, an overflow/underflow doesn't revert.
-                        // If we called it with massive numbers and it succeeded,
-                        // and we can observe a wrap-around (e.g. balance decreases on addition or increases on subtraction)
                         if res.is_success() {
                             let db_after = evm.context.evm.db.clone();
                             let balance = db_after.accounts.get(&contract_address)
                                 .map(|a| a.storage.clone())
                                 .unwrap_or_default();
                             
-                            // Check if wrap-around occurred in storage
                             for (_, val) in balance {
                                 if val == U256::from(0) || val == U256::MAX {
                                     arithmetic_wrapped = true;
@@ -448,6 +441,66 @@ impl VmEngine {
                             }
                         }
                     }
+                }
+
+                // 4. INVARIANT CHECK: Built-in & Custom Invariants
+                for inv in &custom_invariants {
+                    match &inv.kind {
+                        InvariantKind::OwnerNotZero => {
+                            let owner_slot = U256::ZERO;
+                            if let Some(acc) = db.accounts.get(&contract_address) {
+                                if let Some(&val) = acc.storage.get(&owner_slot) {
+                                    if val == U256::ZERO {
+                                        custom_invariant_violated = Some(inv.raw_expr.clone());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        InvariantKind::BalanceNonNegative => {
+                            if let Some(acc) = db.accounts.get(&attacker) {
+                                if acc.info.balance == U256::MAX {
+                                    custom_invariant_violated = Some(inv.raw_expr.clone());
+                                    break;
+                                }
+                            }
+                        }
+                        InvariantKind::TotalSupplyEqualsSum => {
+                            if let Some(acc) = db.accounts.get(&contract_address) {
+                                if let Some(&supply) = acc.storage.get(&U256::from(1)) {
+                                    let attacker_bal = db.accounts.get(&attacker).map(|a| a.info.balance).unwrap_or_default();
+                                    if supply < attacker_bal {
+                                        custom_invariant_violated = Some(inv.raw_expr.clone());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        InvariantKind::CustomStorageNotZero { slot } => {
+                            if let Some(acc) = db.accounts.get(&contract_address) {
+                                if let Some(&val) = acc.storage.get(slot) {
+                                    if val == U256::ZERO {
+                                        custom_invariant_violated = Some(inv.raw_expr.clone());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        InvariantKind::ConstantProductK => {
+                            if let Some(acc) = db.accounts.get(&contract_address) {
+                                if let Some(&k) = acc.storage.get(&U256::from(3)) {
+                                    if k == U256::ZERO {
+                                        custom_invariant_violated = Some(inv.raw_expr.clone());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if custom_invariant_violated.is_some() {
+                    break;
                 }
             }
         }
@@ -512,6 +565,27 @@ impl VmEngine {
                     contract_name
                 ),
                 remediation: "Upgrade to Solidity >= 0.8.0 or use SafeMath library for all arithmetic operations."
+                    .to_string(),
+                confidence: Confidence::High,
+                ai_annotations: None,
+            });
+        }
+
+        if let Some(violated_expr) = custom_invariant_violated {
+            findings.push(Finding {
+                rule_id: "PHOTON-INVARIANT-001".to_string(),
+                severity: Severity::High,
+                engine: Engine::Vm,
+                solver_status: None,
+                file: file_path.to_path_buf(),
+                line: 1,
+                column: None,
+                vuln_class: VulnClass::AccessControl,
+                description: format!(
+                    "[VM Fuzzer] Invariant Violation: Custom property `@invariant {}` failed fuzzer validation in `{}`.",
+                    violated_expr, contract_name
+                ),
+                remediation: "Ensure the contract state preserves the specified invariant under all transaction pathways."
                     .to_string(),
                 confidence: Confidence::High,
                 ai_annotations: None,
@@ -669,6 +743,58 @@ fn decode_hex(s: &str) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
+#[derive(Debug, Clone)]
+enum InvariantKind {
+    BalanceNonNegative,
+    TotalSupplyEqualsSum,
+    OwnerNotZero,
+    ConstantProductK,
+    CustomStorageNotZero { slot: U256 },
+}
+
+#[derive(Debug, Clone)]
+struct CustomInvariant {
+    raw_expr: String,
+    kind: InvariantKind,
+}
+
+fn parse_invariants(source: &str) -> Vec<CustomInvariant> {
+    let mut invariants = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if (trimmed.starts_with("///") || trimmed.starts_with("//")) && trimmed.contains("@invariant") {
+            let part = trimmed.split("@invariant").nth(1).unwrap_or_default().trim();
+            if part.contains("balance >= 0") || part.contains("balance_non_negative") {
+                invariants.push(CustomInvariant {
+                    raw_expr: part.to_string(),
+                    kind: InvariantKind::BalanceNonNegative,
+                });
+            } else if part.contains("totalSupply == sum") || part.contains("total_supply") {
+                invariants.push(CustomInvariant {
+                    raw_expr: part.to_string(),
+                    kind: InvariantKind::TotalSupplyEqualsSum,
+                });
+            } else if part.contains("owner != address(0)") || part.contains("owner != 0") {
+                invariants.push(CustomInvariant {
+                    raw_expr: part.to_string(),
+                    kind: InvariantKind::OwnerNotZero,
+                });
+            } else if part.contains("constant_product") || part.contains("x * y") {
+                invariants.push(CustomInvariant {
+                    raw_expr: part.to_string(),
+                    kind: InvariantKind::ConstantProductK,
+                });
+            } else if part.contains("storage") && part.contains("!= 0") {
+                invariants.push(CustomInvariant {
+                    raw_expr: part.to_string(),
+                    kind: InvariantKind::CustomStorageNotZero { slot: U256::from(2) },
+                });
+            }
+        }
+    }
+    invariants
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -802,7 +928,21 @@ mod tests {
         });
 
         let findings = fuzzer.analyze(&[contract_ir]);
-        assert_eq!(findings.len(), 0); // Safe contract should have no findings!
+        assert_eq!(findings.len(), 0);
+    }
+
+    #[test]
+    fn test_custom_invariant_annotation() {
+        let source = "
+            /// @invariant balance >= 0
+            /// @invariant owner != address(0)
+        ";
+        let parsed = parse_invariants(source);
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].raw_expr, "balance >= 0");
+        assert!(matches!(parsed[0].kind, InvariantKind::BalanceNonNegative));
+        assert_eq!(parsed[1].raw_expr, "owner != address(0)");
+        assert!(matches!(parsed[1].kind, InvariantKind::OwnerNotZero));
     }
 }
 

@@ -1,27 +1,49 @@
 <p align="center">
-  <img src="photon-logo.jpg" alt="Photon Logo" width="250" height="250" style="border-radius: 50%; object-fit: cover;" />
+  <img src="assets/logo-circular.png" alt="Photon Logo" width="200" height="200" />
 </p>
 
-# Photon
+<h1 align="center">Photon</h1>
 
-**Photon** is a Rust-native, multi-engine smart contract vulnerability assessment and security analysis framework. It integrates structural static analysis, SMT-based symbolic verification, and dynamic EVM invariant fuzzing into a unified, high-performance scanning pipeline.
+<p align="center">
+  <b>Rust-native multi-engine smart contract security scanner</b><br/>
+  Static · Symbolic · Dynamic · On-Chain Attestations
+</p>
 
-Designed to be integrated directly into developer workflows (CLI) and CI/CD pipelines, Photon prioritizes speed, determinism, and detailed source-mapped diagnostics with built-in remediation advice.
-
----
-
-## Key Features
-
-- **Multi-Engine Pipeline**: Runs static linting, symbolic verification, and VM fuzzing stages sequentially.
-- **Rayon-Parallel Engine**: Rayon work-stealing parallel static linter for lightning-fast analysis scaling sub-linearly with contract size.
-- **CFG & DFG Graph IR**: Lowers Solidity ASTs into static single assignment (SSA) control flow and data flow graphs.
-- **Deterministic Scanning**: Guarantees identical finding outputs across repeated runs for reproducible CI gating.
-- **On-Chain Attestations**: Integrated Chainlink Functions support for verifiable security attestations on-chain.
-- **Hard-Boundaried AI Layer** (Coming Soon): Optional AI post-processor (Anthropic Claude, OpenAI GPT, Groq Llama) for advisory remediation prose and false-positive triage without mutating or suppressing deterministic results.
+<p align="center">
+  <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square&logo=rust" />
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/rules-50%2B-brightgreen?style=flat-square" />
+  <img src="https://img.shields.io/badge/chainlink-functions-375BD2?style=flat-square&logo=chainlink" />
+  <img src="https://img.shields.io/badge/SARIF-2.1.0-blueviolet?style=flat-square" />
+</p>
 
 ---
 
-## Architecture Overview
+**Photon** is a Rust-native, multi-engine smart contract vulnerability assessment framework. It integrates structural static analysis, SMT-based symbolic verification, dynamic EVM invariant fuzzing, and on-chain Chainlink attestations into a unified, high-performance scanning pipeline.
+
+Designed for direct integration into developer workflows (CLI) and CI/CD pipelines, Photon prioritizes speed, determinism, and detailed source-mapped diagnostics with built-in remediation advice.
+
+---
+
+## ✨ Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **50+ Security Rules** | Ported from Slither's catalog — reentrancy, access control, arithmetic, oracle manipulation, and more |
+| **Multi-Engine Pipeline** | Static linting → Symbolic verification (Z3) → VM fuzzing (revm) |
+| **Rayon-Parallel Engine** | Work-stealing parallel static linter scales sub-linearly with contract size |
+| **CFG & DFG IR** | Lowers Solidity ASTs into SSA control flow and data flow graphs |
+| **Taint Analysis** | BFS-based data-flow taint tracking from user-controlled sources to dangerous sinks |
+| **SARIF Export** | Standard SARIF v2.1.0 output compatible with GitHub Actions and VS Code |
+| **Slither Compatibility** | `--slither-compat` flag outputs Slither-schema JSON with mapped detector IDs |
+| **False-Positive Suppression** | `.photon-ignore` file supports rule/file/function-level and date-expiring suppressions |
+| **On-Chain Attestations** | Chainlink Functions integration — any DeFi protocol can query a contract's risk score on-chain |
+| **Invariant Fuzzing** | Built-in ERC20/DeFi invariants + custom `/// @invariant` Solidity docstring annotations |
+| **AI Layer** *(coming soon)* | Optional Anthropic/OpenAI/Groq post-processor for remediation guidance |
+
+---
+
+## 🏗️ Architecture
 
 Photon is built as a strict, unidirectional pipeline:
 
@@ -35,127 +57,227 @@ Photon is built as a strict, unidirectional pipeline:
        │
        ▼
 ┌──────────────┐
-│  photon-ir   │  ◄── Lowering AST to SSA-form CFG / DFG
+│  photon-ir   │  ◄── AST → SSA-form CFG / DFG + Taint Analysis
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
-│photon-static │  ◄── Parallel linter (CEI violations, Access Control, etc.)
+│photon-static │  ◄── Rayon-parallel linter (50+ rules)
 └──────┬───────┘
        │
-       ├───────────────────────────────┐
-       ▼                               ▼
-┌──────────────┐                ┌──────────────┐
-│photon-symbolic│               │  photon-vm   │
-│ (SMT Solver) │                │ (revm Fuzzer)│
-└──────────────┘                └──────────────┘
+       ├──────────────────────────────┐
+       ▼                              ▼
+┌──────────────┐               ┌──────────────┐
+│photon-symbolic│              │  photon-vm   │
+│  (Z3 / SMT)  │               │(revm Fuzzer) │
+└──────────────┘               └──────────────┘
+       │                              │
+       └──────────────┬───────────────┘
+                      ▼
+              ┌──────────────┐
+              │  photon-cli  │  ◄── Aggregation, filtering, output
+              └──────────────┘
+                      │
+          ┌───────────┼──────────────┐
+          ▼           ▼              ▼
+       Text/JSON    SARIF      Chainlink
+       Report      Report     Attestation
 ```
 
 ---
 
-## Project Status
+## 📊 Project Status
 
-**✅ Completed Phases (1-4):**
-- **Phase 1**: Static Analysis Engine - Rayon-parallel structural pattern matching and rule evaluation
-- **Phase 2**: Symbolic Execution - Z3 SMT solver integration for path verification
-- **Phase 3**: Dynamic VM Fuzzing - revm-based property and invariant testing
-- **Phase 4**: On-Chain Attestations - Chainlink Functions integration for verifiable security proofs
-
-**🚧 In Development:**
-- **Phase 5**: AI-Assisted Analysis Layer - Multi-provider post-processor for remediation guidance and false-positive triage (optional, non-deterministic layer that never affects core findings)
-
----
-
-## Active Security Rules (Phase 1)
-
-Photon currently implements 6 high-precision analysis rules:
-
-1. **`PHOTON-REENTRANCY-001` (Critical)**: CEI Violation (Reentrancy) — Detects external calls preceding state updates in public/external functions.
-2. **`PHOTON-REENTRANCY-002` (High)**: Cross-Function Reentrancy — Detects reentrancy vectors across multiple entry points sharing state variables.
-3. **`PHOTON-ACCESS-001` (High)**: Missing Access Control — Detects public or external state-modifying functions without validation modifiers (e.g., `onlyOwner`).
-4. **`PHOTON-ACCESS-002` (Critical)**: Unprotected `selfdestruct` / `delegatecall` — Detects critical control hijacking vectors.
-5. **`PHOTON-ARITH-001` (High)**: Unchecked Arithmetic — Flags contracts using Solidity < 0.8.0 without importing or using SafeMath.
-6. **`PHOTON-ORACLE-001` (Medium)**: Single-Source Oracle — Detects Chainlink / oracle invocations lacking staleness and heartbeat validation.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **Phase 1** | Static Analysis Engine — 50+ Rayon-parallel rules | ✅ Complete |
+| **Phase 2** | Symbolic Execution — Z3 SMT solver path verification | ✅ Complete |
+| **Phase 3** | Dynamic VM Fuzzing — revm-based invariant fuzzer | ✅ Complete |
+| **Phase 4** | On-Chain Attestations — Chainlink Functions integration | ✅ Complete |
+| **Phase 5** | Advanced CLI — SARIF, Slither compat, taint analysis, `.photon-ignore` | ✅ Complete |
+| **Phase 6** | AI-Assisted Analysis — Multi-provider remediation post-processor | 🚧 In Development |
 
 ---
 
-## Installation & Build
+## 🔍 Security Rules (50+)
+
+### Core Rules
+| Rule ID | Severity | Description |
+|---------|----------|-------------|
+| `PHOTON-REENTRANCY-001` | 🔴 Critical | CEI violation — external call precedes state update |
+| `PHOTON-REENTRANCY-002` | 🔴 Critical | Cross-function reentrancy via shared state variables |
+| `PHOTON-ACCESS-001` | 🟠 High | Missing access control on state-modifying public functions |
+| `PHOTON-ACCESS-002` | 🔴 Critical | Unprotected `selfdestruct` / `delegatecall` |
+| `PHOTON-ARITH-001` | 🟠 High | Unchecked arithmetic on Solidity < 0.8.0 |
+| `PHOTON-ORACLE-001` | 🟡 Medium | Single-source oracle without staleness check |
+
+### Extended Rules (Slither-Ported)
+`tx-origin-auth` · `shadow-variable` · `uninitialized-state` · `divide-before-multiply` · `block-timestamp` · `calls-in-loop` · `dangerous-delegatecall` · `low-level-call` · `selfdestruct` · `floating-pragma` · `arbitrary-send-eth` · `oracle-manipulation` · `locked-ether` · `incorrect-equality` · `constant-function-changing-state` · and 35+ more.
+
+---
+
+## 🚀 Installation & Build
 
 ### Prerequisites
-- **Rust Toolchain**: Rust 1.85.0+ installed via `rustup`.
-- **Linker/Compiler**: GCC / MinGW toolchain (recommended for Windows build portability).
+- **Rust**: 1.86.0+ via `rustup` (`rustup update`)
+- **Windows**: GNU toolchain — `rustup target add x86_64-pc-windows-gnu`
 
 ### Build from Source
 ```bash
-# Clone the repository
 git clone <your-repository-url>
 cd photon
 
-# Build the workspace using the GNU toolchain (Windows)
+# Build optimized release binary
 cargo +stable-x86_64-pc-windows-gnu build --release
 ```
 
+The binary is placed at `./target/release/photon.exe`.
+
 ---
 
-## CLI Usage
+## 💻 CLI Usage
 
-Run scans against a directory of smart contracts:
-
+### Basic Scan
 ```bash
-# Scan a Solidity directory (default human-readable format)
-./target/release/photon scan ./test-contracts
+# Scan a directory of Solidity files
+./target/release/photon scan ./contracts
 
-# Filter output by severity threshold (Critical/High/Medium/Low/Info)
-./target/release/photon scan ./test-contracts --severity-threshold high
+# Filter by minimum severity
+./target/release/photon scan ./contracts --severity-threshold high
 
-# Scan a Solidity directory (default human-readable format)
-./target/release/photon scan ./test-contracts
+# Enable symbolic analysis (Z3)
+./target/release/photon scan ./contracts --symbolic
 
-# Filter output by severity threshold (Critical/High/Medium/Low/Info)
-./target/release/photon scan ./test-contracts --severity-threshold high
-
-# Export report in JSON format for CI pipelines
-./target/release/photon scan ./test-contracts --format json
-
-# Export Chainlink Functions attestation payload
-./target/release/photon scan ./test-contracts --export-attestation attestation.json
+# Enable VM fuzzing (revm)
+./target/release/photon scan ./contracts --fuzz
 ```
 
----
-
-## On-Chain Attestations (Chainlink Functions)
-
-Photon supports on-chain security attestations via **Chainlink Functions**, allowing DeFi protocols and smart contracts to query if a contract has been scanned and verify its risk score.
-
-- **Solidity Attestation Client (`test-contracts/PhotonAttestationConsumer.sol`)**: A consumer contract that requests and stores security attestations (`isScanned`, `riskScore`, `timestamp`).
-- **Off-chain JavaScript Source (`photon-functions/photon-functions-source.js`)**: Executed by Chainlink decentralized oracle nodes (DON), this script queries the Photon scan registry API, decodes the results, and encodes them into a 64-byte payload for on-chain consumption.
-- **Payload Export**: Use the `--export-attestation <path>` flag on the CLI to export JSON metadata for your deployed contracts.
-
-### Other Commands
+### Output Formats
 ```bash
-# List all registered rules
+# JSON output (for CI pipelines)
+./target/release/photon scan ./contracts --format json
+
+# SARIF output (for GitHub / VS Code)
+./target/release/photon scan ./contracts --format sarif
+
+# Slither-compatible JSON (for tooling that consumes Slither output)
+./target/release/photon scan ./contracts --slither-compat
+```
+
+### Export Reports
+```bash
+# Export SARIF report to a file
+./target/release/photon scan ./contracts --export-sarif report.sarif
+
+# Export Chainlink Functions attestation payload
+./target/release/photon scan ./contracts --export-attestation attestation.json
+```
+
+### Utility Commands
+```bash
+# List all registered analysis rules
 ./target/release/photon rules
 
-# Print version and engine status
+# Print version information
 ./target/release/photon version
 ```
 
 ---
 
-## Project Structure
+## 🚫 False Positive Suppression (`.photon-ignore`)
 
-- `photon-types`: Shared schemas, findings, severities, configs, and serialization.
-- `photon-core`: Solidity ingestion, filesystem walk, AST parser, and panic-isolation layer.
-- `photon-ir`: Graph builder lowering AST into CFGs, DFGs, and SSA representation.
-- `photon-static`: The parallel linter engine and standard ruleset.
-- `photon-symbolic`: Z3 SMT solver path verification engine.
-- `photon-vm`: revm-hosted dynamic simulation and property-based invariant fuzzing engine.
-- `photon-functions`: Off-chain Chainlink Functions Javascript source code.
-- `photon-ai`: Multi-provider async post-processor interface (Phase 5 - In Development).
-- `photon-cli`: The terminal CLI binary.
+Place a `.photon-ignore` file in your project root to suppress known false positives:
+
+```bash
+# Rule-level (suppresses this rule across all files)
+PHOTON-SECURITY-007
+
+# File-level (suppresses rule in one file)
+reentrancy.sol:PHOTON-SECURITY-007
+
+# Function-level (suppresses rule only in a specific function)
+arithmetic.sol:mint:PHOTON-ACCESS-001
+
+# Date-expiring (automatically re-enables after the date)
+reentrancy.sol:PHOTON-SECURITY-007:2026-12-31
+```
 
 ---
 
-## License
+## 🔗 On-Chain Attestations (Chainlink Functions)
 
-MIT License. See LICENSE for details.
+Photon supports **verifiable security attestations on-chain** via Chainlink Functions, so any DeFi protocol can trustlessly query a contract's security status before interacting with it.
+
+### How It Works
+
+```
+Photon CLI  ──►  Scan Results  ──►  Your Registry API
+                                           │
+                                   Chainlink DON fetches
+                                           │
+                                           ▼
+                              PhotonAttestationConsumer.sol
+                              attestations[0xContract] = {
+                                isScanned: true,
+                                riskScore: 72,
+                                timestamp: ...
+                              }
+```
+
+### DeFi Integration Example
+```solidity
+// A lending protocol gating collateral acceptance:
+Attestation memory att = photonOracle.attestations[newTokenAddress];
+require(att.isScanned, "Contract not scanned");
+require(att.riskScore < 30, "Risk score too high");
+require(block.timestamp - att.timestamp < 30 days, "Scan expired");
+```
+
+### Files
+- **[`test-contracts/PhotonAttestationConsumer.sol`](test-contracts/PhotonAttestationConsumer.sol)** — Solidity consumer contract (requests + stores attestations)
+- **[`photon-functions/photon-functions-source.js`](photon-functions/photon-functions-source.js)** — JavaScript source executed by Chainlink DON nodes
+
+---
+
+## 🧪 Invariant Fuzzing
+
+Photon's VM fuzzer checks built-in invariants and supports custom `@invariant` annotations in Solidity docstrings:
+
+```solidity
+contract MyToken {
+    /// @invariant balance >= 0
+    /// @invariant totalSupply == sum(balances)
+    /// @invariant owner != address(0)
+    mapping(address => uint256) public balances;
+}
+```
+
+Built-in invariant categories:
+- **ERC20**: Balance non-negativity, total supply consistency
+- **DeFi**: Constant product AMM (`x * y = k`)
+- **Security**: Owner address validation, storage slot integrity
+
+---
+
+## 📁 Project Structure
+
+```
+photon/
+├── photon-cli/        # CLI binary — entry point, argument parsing, output
+├── photon-core/       # Solidity ingestion, filesystem walk, .photon-ignore parser
+├── photon-ir/         # AST → CFG/DFG/SSA lowering + taint analysis engine
+├── photon-static/     # Rayon-parallel rule engine (50+ detectors)
+├── photon-symbolic/   # Z3 SMT solver integration for path verification
+├── photon-vm/         # revm-based invariant fuzzer + @invariant parser
+├── photon-types/      # Shared schemas: findings, severities, SARIF, Slither compat
+├── photon-ai/         # Multi-provider AI post-processor (Phase 6)
+├── photon-functions/  # Chainlink Functions JS source code
+├── test-contracts/    # Sample vulnerable Solidity contracts for testing
+└── assets/            # Logos and branding assets
+```
+
+---
+
+## 📄 License
+
+MIT License. See [LICENSE](LICENSE) for details.
