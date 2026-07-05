@@ -7,5 +7,15 @@ description = "revm-hosted invariant fuzzer engine for Photon (Phase 3)"
 [dependencies]
 photon-types = { path = "../photon-types" }
 photon-ir = { path = "../photon-ir" }
+revm = { version = "8.0.0", default-features = false, features = ["std", "portable"] }
+rand = "0.8"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+serde.workspace = true
+walkdir = "2"
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+petgraph.workspace = true
+tempfile.workspace = true

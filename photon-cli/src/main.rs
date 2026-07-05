@@ -68,6 +68,10 @@ enum Commands {
         /// Enable VM fuzzing (Phase 3)
         #[arg(long, default_value = "false")]
         fuzz: bool,
+
+        /// Export Chainlink Functions attestation payload to the specified JSON file path
+        #[arg(long)]
+        export_attestation: Option<PathBuf>,
     },
 
     /// List available analysis rules
@@ -126,8 +130,9 @@ fn main() {
             severity_threshold,
             symbolic,
             fuzz,
+            export_attestation,
         } => {
-            let exit_code = run_scan(target_dir, format, severity_threshold.into(), symbolic, fuzz);
+            let exit_code = run_scan(target_dir, format, severity_threshold.into(), symbolic, fuzz, export_attestation);
             std::process::exit(exit_code);
         }
         Commands::Rules => {
@@ -145,6 +150,7 @@ fn run_scan(
     threshold: Severity,
     enable_symbolic: bool,
     enable_fuzz: bool,
+    export_attestation: Option<PathBuf>,
 ) -> i32 {
     let start = Instant::now();
 
@@ -278,7 +284,7 @@ fn run_scan(
 
 
     // ═══════════════════════════════════════════════════════════
-    // Stage 4: VM Fuzzing (Phase 3 stub)
+    // Stage 4: VM Fuzzing (revm)
     // ═══════════════════════════════════════════════════════════
     if enable_fuzz {
         println!("{}", "  ◆ Stage 4: VM Fuzzing (revm)".yellow().bold());
@@ -287,9 +293,12 @@ fn run_scan(
             ..VmConfig::default()
         });
         let vm_findings = vm.analyze(&all_irs);
+        println!(
+            "    VM Fuzzer: completed, {} findings emitted",
+            vm_findings.len().to_string().green()
+        );
         findings.extend(vm_findings);
         report.engines_used.push(Engine::Vm);
-        println!("    {}", "Phase 3 stub — no fuzzing performed".dimmed());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -331,6 +340,36 @@ fn run_scan(
         }
         FormatArg::Text => {
             print_text_report(&report);
+        }
+    }
+
+    // Calculate risk score for Chainlink Functions attestation
+    let mut risk_score: u8 = 0;
+    for finding in &report.findings {
+        let weight = match finding.severity {
+            Severity::Critical => 40,
+            Severity::High => 20,
+            Severity::Medium => 10,
+            Severity::Low => 3,
+            Severity::Info => 0,
+        };
+        risk_score = risk_score.saturating_add(weight);
+    }
+    if risk_score > 100 {
+        risk_score = 100;
+    }
+
+    if let Some(att_path) = export_attestation {
+        let att_payload = serde_json::json!({
+            "is_scanned": true,
+            "risk_score": risk_score,
+            "timestamp": chrono::Utc::now().timestamp(),
+            "findings_count": report.findings.len()
+        });
+        if let Err(e) = std::fs::write(&att_path, serde_json::to_string_pretty(&att_payload).unwrap()) {
+            error!("Failed to write attestation payload: {}", e);
+        } else {
+            println!("  ✓ Exported Chainlink Functions attestation payload to {}", att_path.display());
         }
     }
 

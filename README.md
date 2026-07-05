@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.jpg" alt="Photon Logo" width="250" height="250" />
+</p>
+
 # Photon
 
 **Photon** is a Rust-native, multi-engine smart contract vulnerability assessment and security analysis framework. It integrates structural static analysis, SMT-based symbolic verification, and dynamic EVM invariant fuzzing into a unified, high-performance scanning pipeline.
@@ -90,9 +94,28 @@ Run scans against a directory of smart contracts:
 # Filter output by severity threshold (Critical/High/Medium/Low/Info)
 ./target/release/photon scan ./test-contracts --severity-threshold high
 
+# Scan a Solidity directory (default human-readable format)
+./target/release/photon scan ./test-contracts
+
+# Filter output by severity threshold (Critical/High/Medium/Low/Info)
+./target/release/photon scan ./test-contracts --severity-threshold high
+
 # Export report in JSON format for CI pipelines
 ./target/release/photon scan ./test-contracts --format json
+
+# Export Chainlink Functions attestation payload
+./target/release/photon scan ./test-contracts --export-attestation attestation.json
 ```
+
+---
+
+## On-Chain Attestations (Chainlink Functions)
+
+Photon supports on-chain security attestations via **Chainlink Functions**, allowing DeFi protocols and smart contracts to query if a contract has been scanned and verify its risk score.
+
+- **Solidity Attestation Client (`test-contracts/PhotonAttestationConsumer.sol`)**: A consumer contract that requests and stores security attestations (`isScanned`, `riskScore`, `timestamp`).
+- **Off-chain JavaScript Source (`photon-functions/photon-functions-source.js`)**: Executed by Chainlink decentralized oracle nodes (DON), this script queries the Photon scan registry API, decodes the results, and encodes them into a 64-byte payload for on-chain consumption.
+- **Payload Export**: Use the `--export-attestation <path>` flag on the CLI to export JSON metadata for your deployed contracts.
 
 ### Other Commands
 ```bash
@@ -111,9 +134,10 @@ Run scans against a directory of smart contracts:
 - `photon-core`: Solidity ingestion, filesystem walk, AST parser, and panic-isolation layer.
 - `photon-ir`: Graph builder lowering AST into CFGs, DFGs, and SSA representation.
 - `photon-static`: The parallel linter engine and standard ruleset.
-- `photon-symbolic`: Z3 SMT solver path verification engine (Phase 2 stub).
-- `photon-vm`: revm-hosted dynamic simulation and invariant fuzzing engine (Phase 3 stub).
-- `photon-ai`: Multi-provider async post-processor interface (Phase 4 stub).
+- `photon-symbolic`: Z3 SMT solver path verification engine.
+- `photon-vm`: revm-hosted dynamic simulation and property-based invariant fuzzing engine.
+- `photon-functions`: Off-chain Chainlink Functions Javascript source code.
+- `photon-ai`: Multi-provider async post-processor interface (Phase 5 stub).
 - `photon-cli`: The terminal CLI binary.
 
 ---
