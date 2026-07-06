@@ -13,18 +13,19 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
+use photon_ai::AiPostProcessor;
 use photon_core::IngestionEngine;
 use photon_ir::IrBuilder;
 use photon_static::StaticEngine;
 use photon_symbolic::SymbolicEngine;
 use photon_types::{
-    AnalysisStatus, ContractStatus, Engine, Finding, OutputFormat, ScanConfig, ScanReport,
+    ContractStatus, Engine, ScanReport,
     Severity, SymbolicConfig, VmConfig,
 };
 use photon_vm::VmEngine;
 use std::path::PathBuf;
 use std::time::Instant;
-use tracing::{error, info};
+use tracing::error;
 use tracing_subscriber::EnvFilter;
 
 /// Photon — Web3 Vulnerability Assessment Framework
@@ -51,7 +52,8 @@ enum Commands {
     /// Scan a directory of Solidity contracts for vulnerabilities
     Scan {
         /// Target directory containing .sol files
-        target_dir: PathBuf,
+        /// Target directory containing .sol files
+        target_dir: Option<PathBuf>,
 
         /// Output format
         #[arg(short, long, default_value = "text")]
@@ -80,6 +82,18 @@ enum Commands {
         /// Enable Slither compatibility mode (detector name mapping & JSON schema)
         #[arg(long, default_value = "false")]
         slither_compat: bool,
+
+        /// AI provider for annotations (groq, openai, anthropic)
+        #[arg(long)]
+        ai_provider: Option<String>,
+
+        /// API key for the AI provider (or set PHOTON_AI_KEY / GROQ_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY)
+        #[arg(long)]
+        ai_key: Option<String>,
+
+        /// Print an AI-generated executive summary at the end of the scan
+        #[arg(long, default_value = "false")]
+        ai_summary: bool,
     },
 
     /// List available analysis rules
@@ -141,8 +155,25 @@ fn main() {
             export_attestation,
             export_sarif,
             slither_compat,
+            ai_provider,
+            ai_key,
+            ai_summary,
         } => {
-            let exit_code = run_scan(
+            // Resolve AI key: flag > env var (provider-specific) > generic env var
+            let resolved_ai_key = ai_key
+                .or_else(|| std::env::var("PHOTON_AI_KEY").ok())
+                .or_else(|| {
+                    match ai_provider.as_deref() {
+                        Some("groq") => std::env::var("GROQ_API_KEY").ok(),
+                        Some("openai") => std::env::var("OPENAI_API_KEY").ok(),
+                        Some("anthropic") => std::env::var("ANTHROPIC_API_KEY").ok(),
+                        Some("gemini") => std::env::var("GEMINI_API_KEY").ok(),
+                        _ => None,
+                    }
+                });
+
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let exit_code = rt.block_on(run_scan(
                 target_dir,
                 format,
                 severity_threshold.into(),
@@ -151,7 +182,10 @@ fn main() {
                 export_attestation,
                 export_sarif,
                 slither_compat,
-            );
+                ai_provider,
+                resolved_ai_key,
+                ai_summary,
+            ));
             std::process::exit(exit_code);
         }
         Commands::Rules => {
@@ -163,8 +197,8 @@ fn main() {
     }
 }
 
-fn run_scan(
-    target_dir: PathBuf,
+async fn run_scan(
+    target_dir: Option<PathBuf>,
     format: FormatArg,
     threshold: Severity,
     enable_symbolic: bool,
@@ -172,15 +206,42 @@ fn run_scan(
     export_attestation: Option<PathBuf>,
     export_sarif: Option<PathBuf>,
     slither_compat: bool,
+    ai_provider: Option<String>,
+    ai_key: Option<String>,
+    ai_summary: bool,
 ) -> i32 {
     let start = Instant::now();
 
     // Print banner
     print_banner();
 
+    // Project auto-detection if target_dir is omitted
+    let resolved_target = match target_dir {
+        Some(path) => path,
+        None => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            if cwd.join("foundry.toml").exists() || cwd.join("remappings.txt").exists() {
+                println!("{}", "  Foundry project auto-detected! Defaulting to scan ./src".yellow());
+                cwd.join("src")
+            } else if cwd.join("hardhat.config.js").exists() || cwd.join("hardhat.config.ts").exists() {
+                println!("{}", "  Hardhat project auto-detected! Defaulting to scan ./contracts".yellow());
+                cwd.join("contracts")
+            } else if cwd.join("contracts").exists() {
+                println!("{}", "  Local contracts directory detected! Defaulting to scan ./contracts".yellow());
+                cwd.join("contracts")
+            } else if cwd.join("test-contracts").exists() {
+                println!("{}", "  Local test-contracts directory detected! Defaulting to scan ./test-contracts".yellow());
+                cwd.join("test-contracts")
+            } else {
+                println!("{}", "  No specific project config found. Defaulting to current directory (.)".yellow());
+                cwd
+            }
+        }
+    };
+
     println!(
         "{}",
-        format!("  Target: {}", target_dir.display()).cyan()
+        format!("  Target: {}", resolved_target.display()).cyan()
     );
     println!(
         "{}",
@@ -189,7 +250,7 @@ fn run_scan(
     println!();
 
     // Canonicalize target path
-    let target_dir = match target_dir.canonicalize() {
+    let target_dir = match resolved_target.canonicalize() {
         Ok(p) => p,
         Err(e) => {
             error!("Invalid target directory: {}", e);
@@ -430,6 +491,60 @@ fn run_scan(
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // Phase 6: AI Annotations (optional, non-deterministic)
+    // ═══════════════════════════════════════════════════════════
+    if let (Some(provider_name), Some(key)) = (ai_provider.as_deref(), ai_key.as_deref()) {
+        if !report.findings.is_empty() {
+            println!();
+            println!(
+                "{}",
+                format!("  ◆ Stage 6: AI Annotations ({})", provider_name)
+                    .yellow()
+                    .bold()
+            );
+
+            let processor = AiPostProcessor::from_provider(provider_name, key);
+
+            // Annotate findings (caps at 15, prioritises Critical/High)
+            let annotations = processor.annotate(&report.findings).await;
+            let annotated_count = annotations.len();
+
+            // Attach annotations back to findings
+            for (idx, annotation) in annotations {
+                if let Some(finding) = report.findings.get_mut(idx) {
+                    finding.ai_annotations = Some(annotation);
+                }
+            }
+
+            println!(
+                "    {} findings annotated via {}",
+                annotated_count.to_string().green(),
+                provider_name
+            );
+
+            // Print executive summary if requested
+            if ai_summary {
+                if let Some(summary) = processor.summarize(&report.findings).await {
+                    println!();
+                    println!("{}", "  ╔══════════════════════════════════════════════════╗".bright_cyan());
+                    println!("{}", "  ║  AI Executive Summary                           ║".bright_cyan());
+                    println!("{}", "  ╚══════════════════════════════════════════════════╝".bright_cyan());
+                    for line in summary.lines() {
+                        println!("  {}", line.dimmed());
+                    }
+                    println!();
+                }
+            }
+
+            // Re-print text report with AI annotations if in text mode
+            if matches!(format, FormatArg::Text) && !slither_compat {
+                println!();
+                print_text_report_with_ai(&report);
+            }
+        }
+    }
+
     // Exit code based on severity threshold
     if report.has_findings_above_threshold(&threshold) {
         1
@@ -570,7 +685,98 @@ fn print_text_report(report: &ScanReport) {
     println!();
 }
 
+fn print_text_report_with_ai(report: &ScanReport) {
+    println!("{}", "═══════════════════════════════════════════════════".bright_cyan());
+    println!("{}", "  SCAN RESULTS  (with AI annotations)".bright_white().bold());
+    println!("{}", "═══════════════════════════════════════════════════".bright_cyan());
+    println!();
+
+    if report.findings.is_empty() {
+        println!("{}", "  ✓ No vulnerabilities found!".green().bold());
+        println!();
+        return;
+    }
+
+    println!("{}", "───────────────────────────────────────────────────".bright_cyan());
+    for (i, finding) in report.findings.iter().enumerate() {
+        let sev_badge = match finding.severity {
+            Severity::Critical => "CRITICAL".red().bold(),
+            Severity::High => "HIGH".red(),
+            Severity::Medium => "MEDIUM".yellow(),
+            Severity::Low => "LOW".blue(),
+            Severity::Info => "INFO".dimmed(),
+        };
+
+        println!(
+            "  {} [{}] {} ({})",
+            format!("#{}", i + 1).bright_white().bold(),
+            sev_badge,
+            finding.rule_id.bright_white(),
+            format!("{}", finding.engine).dimmed()
+        );
+        println!(
+            "  File: {}:{}",
+            finding.file.display().to_string().cyan(),
+            finding.line
+        );
+        println!("  {}", finding.description);
+        println!(
+            "  {} {}",
+            "Fix:".green().bold(),
+            finding.remediation
+        );
+
+        if let Some(status) = &finding.solver_status {
+            let status_str = match status {
+                photon_types::SolverStatus::Sat => "SAT (confirmed)".red().bold(),
+                photon_types::SolverStatus::Unsat => "UNSAT (safe)".green(),
+                photon_types::SolverStatus::Unknown => "UNKNOWN (inconclusive)".yellow().bold(),
+            };
+            println!("  Solver: {}", status_str);
+        }
+
+        // AI annotation block
+        if let Some(ai) = &finding.ai_annotations {
+            println!();
+            if let (Some(provider), Some(model)) = (&ai.provider, &ai.model) {
+                println!(
+                    "  {} {} ({})",
+                    "💡 AI".bright_yellow().bold(),
+                    provider.bright_yellow(),
+                    model.dimmed()
+                );
+            } else {
+                println!("  {}", "💡 AI Analysis".bright_yellow().bold());
+            }
+            if let Some(detail) = &ai.remediation_detail {
+                for line in detail.lines() {
+                    println!("  {}", line.dimmed());
+                }
+            }
+            if let Some(fp) = ai.fp_confidence {
+                let fp_label = if fp < 0.2 {
+                    format!("False-positive confidence: {:.0}% (likely real)", fp * 100.0).red()
+                } else if fp < 0.6 {
+                    format!("False-positive confidence: {:.0}% (uncertain)", fp * 100.0).yellow()
+                } else {
+                    format!("False-positive confidence: {:.0}% (possible FP)", fp * 100.0).green()
+                };
+                println!("  {}", fp_label);
+            }
+            println!();
+        }
+
+        println!(
+            "{}",
+            "───────────────────────────────────────────────────".bright_cyan()
+        );
+    }
+
+    println!();
+}
+
 fn list_rules() {
+
     print_banner();
     println!("{}", "  Available Analysis Rules".bright_white().bold());
     println!("{}", "═══════════════════════════════════════════════════".bright_cyan());

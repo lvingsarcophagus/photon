@@ -1,0 +1,23 @@
+{
+  "name": "hardhat-photon",
+  "version": "0.1.0",
+  "description": "Hardhat plugin to run the Photon smart contract vulnerability scanner",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "hardhat": "^2.0.0"
+  },
+  "keywords": [
+    "hardhat",
+    "hardhat-plugin",
+    "smart-contracts",
+    "security",
+    "photon",
+    "static-analysis"
+  ],
+  "author": "",
+  "license": "MIT"
+}

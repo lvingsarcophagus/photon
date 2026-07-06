@@ -184,6 +184,29 @@ The binary is placed at `./target/release/photon.exe`.
 
 ---
 
+## 🛠️ Developer Integrations (Foundry & Hardhat)
+
+### 1. Zero-Config Project Scanning
+If you omit the target path, Photon will automatically scan your workspace:
+```bash
+# Automatically detects foundry.toml/remappings.txt -> scans `./src`
+# Automatically detects hardhat.config.js/ts -> scans `./contracts`
+# Automatically detects `./contracts` or `./test-contracts` folders
+./target/release/photon scan
+```
+
+### 2. Hardhat Plugin
+Run Photon directly inside your Hardhat task suite:
+```bash
+# Add the local plugin to your package.json devDependencies:
+# "hardhat-photon": "file:./photon-hardhat"
+
+# Run scan using Hardhat task:
+npx hardhat photon --symbolic --fuzz
+```
+
+---
+
 ## 🚫 False Positive Suppression (`.photon-ignore`)
 
 Place a `.photon-ignore` file in your project root to suppress known false positives:
