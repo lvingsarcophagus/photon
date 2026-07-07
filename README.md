@@ -304,3 +304,13 @@ photon/
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## ⚖️ Disclaimer & Attribution
+
+Photon's static analysis rules include independent, clean-room Rust implementations of security checks described in the Slither detector catalog.
+
+* **Slither** is a registered trademark of, and maintained by, **Trail of Bits**.
+* Slither is licensed under the **GNU AGPL-3.0 License**.
+* Photon is an independent project and is not affiliated with, endorsed by, or sponsored by Trail of Bits.
