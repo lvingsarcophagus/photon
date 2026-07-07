@@ -110,18 +110,23 @@ define_rule!(
     "Detects usage of tx.origin for authentication or authorization checks.",
     |_, ir: &ContractIR| {
         let mut findings = Vec::new();
+        use solang_parser::pt::Loc;
         for func in &ir.functions {
             for stmt in &func.statements {
                 if let photon_ir::IrStmtKind::Guard { .. } = &stmt.kind {
-                    if ir.source.contains("tx.origin") {
-                        findings.push(RuleFinding {
-                            line: stmt.source_line,
-                            column: None,
-                            description: format!("Function `{}` uses tx.origin for authorization.", func.name),
-                            remediation: "Use msg.sender instead of tx.origin to prevent phishing/reentrancy bypass attacks.".to_string(),
-                            escalate_to_symbolic: false,
-                        });
-                        break;
+                    if let Loc::File(_, start, end) = stmt.loc {
+                        if start < end && end <= ir.source.len() {
+                            let stmt_source = &ir.source[start..end];
+                            if stmt_source.contains("tx.origin") {
+                                findings.push(RuleFinding {
+                                    line: stmt.source_line,
+                                    column: None,
+                                    description: format!("Function `{}` uses tx.origin for authorization.", func.name),
+                                    remediation: "Use msg.sender instead of tx.origin to prevent phishing/reentrancy bypass attacks.".to_string(),
+                                    escalate_to_symbolic: false,
+                                });
+                            }
+                        }
                     }
                 }
             }

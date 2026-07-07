@@ -58,6 +58,13 @@ impl Rule for MissingAccessControl {
             "pauser",
             "minter",
             "whennotpaused",
+            "check",
+            "permission",
+            "access",
+            "manager",
+            "controller",
+            "writer",
+            "verifier",
         ];
 
         for func in &ir.functions {

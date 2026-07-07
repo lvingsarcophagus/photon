@@ -176,11 +176,32 @@ impl IngestionEngine {
         }
 
         let mut files = Vec::new();
-        for entry in WalkDir::new(dir)
-            .follow_links(false) // Don't follow symlinks (security)
+        let walker = WalkDir::new(dir)
+            .follow_links(false)
             .into_iter()
-            .filter_map(|e| e.ok())
-        {
+            .filter_entry(|entry| {
+                if let Some(name) = entry.path().file_name() {
+                    let name_str = name.to_string_lossy();
+                    if name_str == "node_modules"
+                        || name_str == ".git"
+                        || name_str == "target"
+                        || name_str == "build"
+                        || name_str == "testhelpers"
+                        || name_str == "mocks"
+                        || name_str == "vendor"
+                        || name_str == "test-helpers"
+                        || name_str == "mock"
+                        || name_str == "test"
+                        || name_str == "tests"
+                        || name_str == "test-contracts"
+                    {
+                        return false;
+                    }
+                }
+                true
+            });
+
+        for entry in walker.filter_map(|e| e.ok()) {
             if entry.file_type().is_file() {
                 if let Some(ext) = entry.path().extension() {
                     if self
