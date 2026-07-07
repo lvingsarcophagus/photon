@@ -45,18 +45,19 @@ impl Rule for MissingAccessControl {
     fn check(&self, ir: &ContractIR) -> Vec<RuleFinding> {
         let mut findings = Vec::new();
 
-        // Common access control modifier names
+        // Common access control modifier keywords
         let access_modifiers = [
-            "onlyowner",
-            "onlyadmin",
-            "onlyrole",
-            "onlyauthorized",
-            "onlyminter",
-            "onlygovernance",
-            "onlypauser",
-            "whennotpaused",
+            "only",
+            "admin",
+            "owner",
             "auth",
+            "role",
+            "guard",
             "restricted",
+            "governor",
+            "pauser",
+            "minter",
+            "whennotpaused",
         ];
 
         for func in &ir.functions {

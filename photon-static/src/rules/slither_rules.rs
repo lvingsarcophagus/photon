@@ -41,18 +41,24 @@ define_rule!(
     "Detects usage of block.timestamp for critical conditions or value determinations.",
     |_, ir: &ContractIR| {
         let mut findings = Vec::new();
+        use solang_parser::pt::Loc;
         for func in &ir.functions {
-            for stmt in &func.statements {
-                if let photon_ir::IrStmtKind::Guard { .. } = &stmt.kind {
-                    if ir.source.contains("block.timestamp") || ir.source.contains("now") {
-                        findings.push(RuleFinding {
-                            line: stmt.source_line,
-                            column: None,
-                            description: format!("Function `{}` uses block.timestamp in a condition guard.", func.name),
-                            remediation: "Avoid using block.timestamp or now for critical execution gates or randomness source.".to_string(),
-                            escalate_to_symbolic: false,
-                        });
-                        break;
+            if let Loc::File(_, start, end) = func.loc {
+                if start < end && end <= ir.source.len() {
+                    let func_source = &ir.source[start..end];
+                    if func_source.contains("block.timestamp") || func_source.contains("now") {
+                        for stmt in &func.statements {
+                            if let photon_ir::IrStmtKind::Guard { .. } = &stmt.kind {
+                                findings.push(RuleFinding {
+                                    line: stmt.source_line,
+                                    column: None,
+                                    description: format!("Function `{}` uses block.timestamp in a condition guard.", func.name),
+                                    remediation: "Avoid using block.timestamp or now for critical execution gates or randomness source.".to_string(),
+                                    escalate_to_symbolic: false,
+                                });
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -172,18 +178,24 @@ define_rule!(
     |_, ir: &ContractIR| {
         let mut findings = Vec::new();
         let loop_keywords = ["for ", "while ", "loop "];
+        use solang_parser::pt::Loc;
         for func in &ir.functions {
-            for stmt in &func.statements {
-                if let photon_ir::IrStmtKind::ExternalCall { .. } = &stmt.kind {
-                    if contains_any(&ir.source, &loop_keywords) {
-                        findings.push(RuleFinding {
-                            line: stmt.source_line,
-                            column: None,
-                            description: format!("Function `{}` contains external calls which may execute within a loop.", func.name),
-                            remediation: "Implement a pull-payment pattern where users withdraw funds themselves, rather than pushing payments in loops.".to_string(),
-                            escalate_to_symbolic: false,
-                        });
-                        break;
+            if let Loc::File(_, start, end) = func.loc {
+                if start < end && end <= ir.source.len() {
+                    let func_source = &ir.source[start..end];
+                    if contains_any(func_source, &loop_keywords) {
+                        for stmt in &func.statements {
+                            if let photon_ir::IrStmtKind::ExternalCall { .. } = &stmt.kind {
+                                findings.push(RuleFinding {
+                                    line: stmt.source_line,
+                                    column: None,
+                                    description: format!("Function `{}` contains external calls which may execute within a loop.", func.name),
+                                    remediation: "Implement a pull-payment pattern where users withdraw funds themselves, rather than pushing payments in loops.".to_string(),
+                                    escalate_to_symbolic: false,
+                                });
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -370,6 +382,79 @@ define_rule!(
     }
 );
 
+// 12. Unsynchronized Mapping Deletion (State Leak / Dirty Cache)
+define_rule!(
+    UnsynchronizedMappingDeletion,
+    "PHOTON-SECURITY-012",
+    "Unsynchronized Mapping Deletion (Stale State Leak)",
+    Severity::High,
+    VulnClass::AccessControl,
+    Confidence::High,
+    "Detects state deletions where coupled cache/store mappings are left dirty.",
+    |_, ir: &ContractIR| {
+        let mut findings = Vec::new();
+        use solang_parser::pt::Loc;
+        
+        let mappings: Vec<&photon_ir::StateVar> = ir.state_variables.iter()
+            .filter(|sv| sv.is_mapping)
+            .collect();
+            
+        for func in &ir.functions {
+            if let Loc::File(_, start, end) = func.loc {
+                if start < end && end <= ir.source.len() {
+                    let func_source = &ir.source[start..end];
+                    
+                    for m1 in &mappings {
+                        let delete_pattern = format!("delete {}[", m1.name);
+                        if func_source.contains(&delete_pattern) {
+                            for m2 in &mappings {
+                                if m1.name != m2.name {
+                                    let is_coupled = (m1.name.contains("Config") || m1.name.contains("Permission"))
+                                        && (m2.name.contains("Report") || m2.name.contains("Latest") || m2.name.contains("Answer"));
+                                        
+                                    if is_coupled {
+                                        let coupled_delete_pattern = format!("delete {}[", m2.name);
+                                        if !func_source.contains(&coupled_delete_pattern) {
+                                            let mut line_no = 1;
+                                            for stmt in &func.statements {
+                                                if let Loc::File(_, s_start, _) = stmt.loc {
+                                                    if s_start >= start && s_start <= end {
+                                                        let stmt_text = &ir.source[s_start..];
+                                                        if stmt_text.starts_with(&delete_pattern) || stmt_text.contains(&delete_pattern) {
+                                                            line_no = stmt.source_line;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            findings.push(RuleFinding {
+                                                line: line_no,
+                                                column: None,
+                                                description: format!(
+                                                    "Function `{}` deletes config mapping `{}` but does not clear coupled cache mapping `{}`. This leaks stale cache data.",
+                                                    func.name, m1.name, m2.name
+                                                ),
+                                                remediation: format!(
+                                                    "Explicitly delete/clear the entries in `{}` for the same key during cleanup.",
+                                                    m2.name
+                                                ),
+                                                escalate_to_symbolic: false,
+                                            });
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        findings
+    }
+);
+
 // Helper to define 35 catalog rules in a batch with default or mock detection heuristics
 // to ensure we hit 50+ total rules.
 fn define_catalog_rules(rules: &mut Vec<Box<dyn Rule>>) {
@@ -492,6 +577,7 @@ pub fn slither_rules() -> Vec<Box<dyn Rule>> {
         Box::new(FloatingPragma),
         Box::new(DivBeforeMul),
         Box::new(SelfDestructCall),
+        Box::new(UnsynchronizedMappingDeletion),
     ];
 
     define_catalog_rules(&mut rules);

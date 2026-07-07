@@ -79,6 +79,10 @@ enum Commands {
         #[arg(long)]
         export_sarif: Option<PathBuf>,
 
+        /// Export findings to a fully-formatted HTML report file
+        #[arg(long)]
+        export_html: Option<PathBuf>,
+
         /// Enable Slither compatibility mode (detector name mapping & JSON schema)
         #[arg(long, default_value = "false")]
         slither_compat: bool,
@@ -154,6 +158,7 @@ fn main() {
             fuzz,
             export_attestation,
             export_sarif,
+            export_html,
             slither_compat,
             ai_provider,
             ai_key,
@@ -181,6 +186,7 @@ fn main() {
                 fuzz,
                 export_attestation,
                 export_sarif,
+                export_html,
                 slither_compat,
                 ai_provider,
                 resolved_ai_key,
@@ -205,6 +211,7 @@ async fn run_scan(
     enable_fuzz: bool,
     export_attestation: Option<PathBuf>,
     export_sarif: Option<PathBuf>,
+    export_html: Option<PathBuf>,
     slither_compat: bool,
     ai_provider: Option<String>,
     ai_key: Option<String>,
@@ -407,6 +414,42 @@ async fn run_scan(
     }
 
     // ═══════════════════════════════════════════════════════════
+    // Deduplication — keyed on (rule_id, file, line, engine, solver_status)
+    //
+    // Root causes this handles:
+    //   1. Pragma-rule fan-out: fires once per contract IR, but
+    //      PermissionlessFeedsConsumer.sol has 7 contracts in one file.
+    //   2. Symbolic IR revisit: generates one query per call-site that
+    //      references IOwnable.owner, not once per unique function.
+    //   3. Any future cross-engine re-emission.
+    //
+    // Strategy: stable sort already done; iterate in order and keep only
+    // the first occurrence of each unique key.
+    // ═══════════════════════════════════════════════════════════
+    {
+        use std::collections::HashSet;
+        let before_dedup = findings.len();
+        let mut seen: HashSet<(String, String, u32, String, String)> = HashSet::new();
+        findings.retain(|f| {
+            let key = (
+                f.rule_id.clone(),
+                f.file.display().to_string(),
+                f.line,
+                format!("{}", f.engine),
+                format!("{:?}", f.solver_status),
+            );
+            seen.insert(key)
+        });
+        let deduped = before_dedup - findings.len();
+        if deduped > 0 {
+            println!(
+                "    ✓ Deduplicated {} redundant findings (same rule·file·line·engine)",
+                deduped.to_string().green()
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // Aggregate Results
     // ═══════════════════════════════════════════════════════════
     report.findings = findings;
@@ -458,6 +501,15 @@ async fn run_scan(
             error!("Failed to write SARIF report: {}", e);
         } else {
             println!("  ✓ Exported SARIF report to {}", sarif_path.display());
+        }
+    }
+
+    if let Some(html_path) = export_html {
+        let html = report.to_html();
+        if let Err(e) = std::fs::write(&html_path, html) {
+            error!("Failed to write HTML report: {}", e);
+        } else {
+            println!("  ✓ Exported HTML report to {}", html_path.display());
         }
     }
 

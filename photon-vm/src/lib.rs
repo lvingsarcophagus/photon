@@ -860,6 +860,7 @@ mod tests {
             state_variables: Vec::new(),
             status: AnalysisStatus::Complete,
             source: "".to_string(),
+            is_interface: false,
         };
 
         let fuzzer = VmEngine::new(VmConfig {
@@ -918,6 +919,7 @@ mod tests {
             state_variables: Vec::new(),
             status: AnalysisStatus::Complete,
             source: "".to_string(),
+            is_interface: false,
         };
 
         let fuzzer = VmEngine::new(VmConfig {

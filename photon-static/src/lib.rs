@@ -12,7 +12,6 @@ pub mod rules;
 use photon_ir::ContractIR;
 use photon_types::{Confidence, Engine, Finding, Severity, StaticConfig, VulnClass};
 use rayon::prelude::*;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
@@ -118,6 +117,16 @@ impl StaticEngine {
         let all_findings: Arc<Mutex<Vec<Finding>>> = Arc::new(Mutex::new(Vec::new()));
 
         contracts.par_iter().for_each(|contract| {
+            // Skip interface and test contracts globally
+            if contract.is_interface {
+                debug!("Skipping interface: {}", contract.name);
+                return;
+            }
+            if contract.is_test() {
+                debug!("Skipping test contract: {}", contract.name);
+                return;
+            }
+
             for rule in &self.rules {
                 // Skip disabled rules
                 if self.config.disabled_rules.contains(rule.id()) {
@@ -195,19 +204,26 @@ impl StaticEngine {
         // Convert rule findings to full findings
         let findings: Vec<Finding> = rule_findings
             .into_iter()
-            .map(|rf| Finding {
-                rule_id: rule.id().to_string(),
-                severity: rule.severity(),
-                engine: Engine::Static,
-                solver_status: None,
-                file: contract.path.clone(),
-                line: rf.line,
-                column: rf.column,
-                vuln_class: rule.vuln_class(),
-                description: rf.description,
-                remediation: rf.remediation,
-                confidence: rule.confidence(),
-                ai_annotations: None,
+            .map(|rf| {
+                let actual_line = {
+                    let offset = rf.line as usize;
+                    let before = &contract.source[0..offset.min(contract.source.len())];
+                    (before.chars().filter(|&c| c == '\n').count() + 1) as u32
+                };
+                Finding {
+                    rule_id: rule.id().to_string(),
+                    severity: rule.severity(),
+                    engine: Engine::Static,
+                    solver_status: None,
+                    file: contract.path.clone(),
+                    line: actual_line,
+                    column: rf.column,
+                    vuln_class: rule.vuln_class(),
+                    description: rf.description,
+                    remediation: rf.remediation,
+                    confidence: rule.confidence(),
+                    ai_annotations: None,
+                }
             })
             .collect();
 

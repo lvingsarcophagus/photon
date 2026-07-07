@@ -235,6 +235,24 @@ pub struct ContractIR {
     pub status: AnalysisStatus,
     /// Raw source for source mapping.
     pub source: String,
+    /// Whether this is an interface contract.
+    pub is_interface: bool,
+}
+
+impl ContractIR {
+    /// Checks if this is a test contract (e.g. from Foundry or containing test in path).
+    pub fn is_test(&self) -> bool {
+        let path_str = self.path.to_string_lossy().to_lowercase();
+        path_str.contains("/test/")
+            || path_str.contains("\\test\\")
+            || path_str.contains("/tests/")
+            || path_str.contains("\\tests\\")
+            || path_str.contains("/test-contracts/")
+            || path_str.contains("\\test-contracts\\")
+            || path_str.ends_with(".t.sol")
+            || self.name.ends_with("Test")
+            || self.name.contains("Test")
+    }
 }
 
 /// SSA variable counter for deterministic numbering.
@@ -308,6 +326,7 @@ impl IrBuilder {
                                     error: e.to_string(),
                                 },
                                 source: contract.source.clone(),
+                                is_interface: matches!(def.ty, ContractTy::Interface(_)),
                             });
                         }
                     }
@@ -385,6 +404,7 @@ impl IrBuilder {
             state_variables,
             status: AnalysisStatus::Complete,
             source: contract.source.clone(),
+            is_interface: matches!(def.ty, ContractTy::Interface(_)),
         })
     }
 
@@ -505,10 +525,36 @@ impl IrBuilder {
             Statement::VariableDefinition(loc, _decl, Some(init)) => {
                 self.extract_expr_statements(init, *loc, stmts, dfg, dfg_nodes, ssa, state_vars);
             }
-            Statement::If(_loc, cond, then_body, else_body) => {
+            Statement::If(loc, cond, then_body, else_body) => {
                 self.visit_expr(cond, stmts, dfg, dfg_nodes, ssa, state_vars);
+                
+                if is_terminating(then_body) {
+                    stmts.push(IrStatement {
+                        kind: IrStmtKind::Guard { guard_type: GuardType::If },
+                        loc: *loc,
+                        source_line: loc_to_line(*loc),
+                    });
+                    let node = dfg.add_node(DfgNode::Guard {
+                        guard_type: GuardType::If,
+                        loc: *loc,
+                    });
+                    dfg_nodes.push(node);
+                }
+
                 self.extract_statements(then_body, stmts, dfg, dfg_nodes, ssa, state_vars);
                 if let Some(else_stmt) = else_body {
+                    if is_terminating(else_stmt) {
+                        stmts.push(IrStatement {
+                            kind: IrStmtKind::Guard { guard_type: GuardType::If },
+                            loc: *loc,
+                            source_line: loc_to_line(*loc),
+                        });
+                        let node = dfg.add_node(DfgNode::Guard {
+                            guard_type: GuardType::If,
+                            loc: *loc,
+                        });
+                        dfg_nodes.push(node);
+                    }
                     self.extract_statements(else_stmt, stmts, dfg, dfg_nodes, ssa, state_vars);
                 }
             }
@@ -730,6 +776,30 @@ fn loc_to_line(loc: Loc) -> u32 {
     match loc {
         Loc::File(_, start, _) => start as u32,
         _ => 0,
+    }
+}
+
+/// Recursively checks if a Statement is terminating (revert, return, break, continue).
+fn is_terminating(stmt: &Statement) -> bool {
+    match stmt {
+        Statement::Block { statements, .. } => {
+            statements.iter().any(|s| is_terminating(s))
+        }
+        Statement::Return(..) | Statement::Break(..) | Statement::Continue(..) => true,
+        Statement::Expression(_, expr) => {
+            if let Expression::FunctionCall(_, func_expr, _) = expr {
+                if let Expression::Variable(id) = func_expr.as_ref() {
+                    if id.name == "revert" {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        _ => {
+            let name = format!("{:?}", stmt);
+            name.contains("Revert") || name.contains("Throw")
+        }
     }
 }
 

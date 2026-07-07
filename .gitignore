@@ -4,3 +4,9 @@
 .idea/
 .vscode/
 .DS_Store
+
+# Generated Scan Reports & Security Artifacts
+*.html
+*.sarif
+attestation-test.json
+poc_submission_report.md

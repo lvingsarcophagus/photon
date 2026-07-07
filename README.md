@@ -25,7 +25,7 @@ Designed for direct integration into developer workflows (CLI) and CI/CD pipelin
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 | Feature | Description |
 |---------|-------------|
@@ -43,7 +43,7 @@ Designed for direct integration into developer workflows (CLI) and CI/CD pipelin
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 Photon is built as a strict, unidirectional pipeline:
 
@@ -86,7 +86,7 @@ Photon is built as a strict, unidirectional pipeline:
 
 ---
 
-## 📊 Project Status
+## Project Status
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -99,7 +99,7 @@ Photon is built as a strict, unidirectional pipeline:
 
 ---
 
-## 🔍 Security Rules (50+)
+## Security Rules (50+)
 
 ### Core Rules
 | Rule ID | Severity | Description |
@@ -116,7 +116,7 @@ Photon is built as a strict, unidirectional pipeline:
 
 ---
 
-## 🚀 Installation & Build
+## Installation & Build
 
 ### Prerequisites
 - **Rust**: 1.86.0+ via `rustup` (`rustup update`)
@@ -135,7 +135,7 @@ The binary is placed at `./target/release/photon.exe`.
 
 ---
 
-## 💻 CLI Usage
+## CLI Usage
 
 ### Basic Scan
 ```bash
@@ -184,7 +184,7 @@ The binary is placed at `./target/release/photon.exe`.
 
 ---
 
-## 🛠️ Developer Integrations (Foundry & Hardhat)
+## Developer Integrations (Foundry & Hardhat)
 
 ### 1. Zero-Config Project Scanning
 If you omit the target path, Photon will automatically scan your workspace:
@@ -207,7 +207,7 @@ npx hardhat photon --symbolic --fuzz
 
 ---
 
-## 🚫 False Positive Suppression (`.photon-ignore`)
+## False Positive Suppression (`.photon-ignore`)
 
 Place a `.photon-ignore` file in your project root to suppress known false positives:
 
@@ -227,7 +227,7 @@ reentrancy.sol:PHOTON-SECURITY-007:2026-12-31
 
 ---
 
-## 🔗 On-Chain Attestations (Chainlink Functions)
+## On-Chain Attestations (Chainlink Functions)
 
 Photon supports **verifiable security attestations on-chain** via Chainlink Functions, so any DeFi protocol can trustlessly query a contract's security status before interacting with it.
 
@@ -262,7 +262,7 @@ require(block.timestamp - att.timestamp < 30 days, "Scan expired");
 
 ---
 
-## 🧪 Invariant Fuzzing
+## Invariant Fuzzing
 
 Photon's VM fuzzer checks built-in invariants and supports custom `@invariant` annotations in Solidity docstrings:
 
@@ -282,7 +282,7 @@ Built-in invariant categories:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 photon/
@@ -301,6 +301,6 @@ photon/
 
 ---
 
-## 📄 License
+## License
 
 MIT License. See [LICENSE](LICENSE) for details.
