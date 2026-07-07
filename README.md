@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-circular.png" alt="Photon Logo" width="200" height="200" />
+  <img src="assets/logo-photon.png" alt="Photon Logo" width="200" height="200" />
 </p>
 
 <h1 align="center">Photon</h1>
